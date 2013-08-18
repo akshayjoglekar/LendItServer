@@ -1,0 +1,123 @@
+
+<project name="LendItServer" basedir="." default="package">
+	
+	<!-- project-specific variables -->
+    <property name="webapp.name" value="lendit" />
+    <property name="package.name" value="${webapp.name}.war" />	
+    <property environment="env" />
+    <property name="lib.dir" value="WebContent/WEB-INF/lib" />
+    <property name="src.dir" value="src" />
+    <property name="prod.conf.dir" value="prod" />
+    <property name="qa.conf.dir" value="qa" />
+    <property name="src.tests.dir" value="src-tests" />
+    <property name="webinf.dir" value="WebContent/WEB-INF" />
+    <property name="web.dir" value="WebContent" />
+    <property name="dist.dir" value="dist" />
+    <property name="make.dir" value="make" />
+    <property name="make.dir.webapp" value="${make.dir}/${webapp.name}" />
+    <property name="make.dir.java.webapp" value="${make.dir}/java/${webapp.name}" />
+    <property name="make.dir.webapp.web-inf" value="${make.dir}/${webapp.name}/WEB-INF" />
+    <property name="make.dir.webapp.web-inf.lib" value="${make.dir}/${webapp.name}/WEB-INF/lib" />
+    <property name="make.dir.webapp.web-inf.classes" value="${make.dir}/${webapp.name}/WEB-INF/classes" />
+    <property name="make.dir.webapp.meta-inf" value="${make.dir}/${webapp.name}/META-INF" />
+
+    <property name="package.file" value="${dest.dir}/${webapp.name}/${webapp.name}${webapp.version}/${package.name}" />
+	
+    <path id="make.class.path">
+        <fileset dir="${lib.dir}">
+            <include name="**/*.jar" />
+        </fileset>
+    </path>
+
+    <target name="clean">
+        <delete dir="${dist.dir}"  failonerror="true"/>
+        <delete dir="${make.dir}"  failonerror="true"/>
+        <delete dir="${make.dir}/${webapp.name}" failonerror="true"/>
+        <delete dir="${make.dir.java.webapp}" failonerror="true"/>
+    </target>
+
+    <target name="prepare" depends="clean">
+        <mkdir dir="${dist.dir}" />
+        <mkdir dir="${dist.dir}/${prod.conf.dir}" />
+        <mkdir dir="${dist.dir}/${qa.conf.dir}" />
+        <mkdir dir="${make.dir.webapp}" />
+        <mkdir dir="${make.dir.webapp.meta-inf}"/>
+        <mkdir dir="${make.dir.java.webapp}" />
+        <mkdir dir="${make.dir.webapp.web-inf}" />
+        <mkdir dir="${make.dir.webapp.web-inf.lib}" />
+        <mkdir dir="${make.dir.webapp.web-inf.classes}" />		
+    </target>	
+    <target name="compile" depends="prepare">
+        <echo>=== COMPILE ===</echo>
+        <echo>Compiling ${src.dir} files ...</echo>		
+        <echo> ${lib.dir}</echo>
+        <javac debug="on" srcdir="${src.dir}" destdir="${make.dir.java.webapp}" includes="**/*">
+            <classpath>				
+                <fileset dir="${lib.dir}">
+                    <include name="**/*.jar" />
+                </fileset>
+            </classpath>
+        </javac>
+    </target>
+	
+	<!-- PACKAGE -->
+    <target name="package" depends="compile">
+        <echo>=== PACKAGE ===</echo>
+		<!-- copy the config files -->
+        <echo message="module_version=${webapp.name}_${module_version}" file="${make.dir.webapp}/version.txt"/>
+        <copy file="${web.dir}/META-INF/MANIFEST.MF" tofile="${make.dir.webapp.meta-inf}/MANIFEST.MF" overwrite="true" />
+        <copy file="${webinf.dir}/web.xml" tofile="${make.dir.webapp.web-inf}/web.xml" overwrite="true" />
+        <copy todir="${make.dir.webapp.web-inf.classes}">
+            <fileset dir="${web.dir}/conf">
+                <exclude name="**/*.conf"/>                            
+            </fileset>
+        </copy>
+        <copy todir="${make.dir.webapp.web-inf.lib}">
+            <fileset dir="${lib.dir}"/>
+        </copy>
+        <delete file="${make.dir.webapp.web-inf.lib}/servlet-api.jar" failonerror="false"/>
+        <jar destfile="${make.dir.webapp.web-inf.lib}/${webapp.name}.jar">
+            <fileset dir="${make.dir.java.webapp}"/>
+            <fileset dir="${src.dir}" includes="**/*.xml"/>
+        </jar>
+		<!-- the ant war task. with all resources in place, makee the war file -->
+        <war destfile="${make.dir.webapp}\${webapp.name}.war" webxml="${make.dir.webapp.web-inf}/web.xml" basedir="${make.dir.webapp}">
+			<!--<lib dir="${lib.dir}" />-->
+       </war>
+       <move file="${make.dir.webapp}\${webapp.name}.war" tofile="${dist.dir}/${webapp.name}.war" overwrite="true" failonerror="false"/>
+       <copy todir="${dist.dir}/${prod.conf.dir}">
+            <fileset dir="${prod.conf.dir}">
+                <include name="**/*.*"/>                            
+            </fileset>
+       </copy>
+       <copy todir="${dist.dir}/${qa.conf.dir}">
+            <fileset dir="${qa.conf.dir}">
+                <include name="**/*.*"/>                            
+            </fileset>
+        </copy>
+    </target>
+	<!-- PACKAGE TAR -->
+    <target name="packageTar">
+        <antcall target="package">
+            <param name="module_version" value="${module_version}"/>
+        </antcall>		
+        <mkdir dir="${dist.dir}/temp"/>
+        <mkdir dir="${dist.dir}/temp/${webapp.name}.${module_version}"/>
+        <copy file="${dist.dir}/${webapp.name}.war" tofile="${dist.dir}/temp/${webapp.name}.${module_version}/${webapp.name}.war" overwrite="true" failonerror="true"/>
+		<copy todir="${dist.dir}/temp/${webapp.name}.${module_version}/${prod.conf.dir}">
+            <fileset dir="${prod.conf.dir}">
+                <include name="**/*.*"/>                            
+            </fileset>
+       </copy>
+       <copy todir="${dist.dir}/temp/${webapp.name}.${module_version}/${qa.conf.dir}">
+            <fileset dir="${qa.conf.dir}">
+                <include name="**/*.*"/>                            
+            </fileset>
+        </copy>
+        <property name="archive.target" value="${dist.dir}/${webapp.name}.${module_version}" />
+        <tar destfile="${dist.dir}/${webapp.name}.${module_version}.tar" basedir="${dist.dir}/temp" />
+        <gzip destfile="${archive.target}.tar.gz" src="${archive.target}.tar" />
+        <delete file="${archive.target}.tar" />		
+        <delete dir="${dist.dir}/temp"/>
+    </target>
+</project>
